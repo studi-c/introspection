@@ -5,6 +5,7 @@
 
 #include <iostream>
 #include <type_traits>
+#include <string>
 
 
 struct A {};
@@ -71,7 +72,11 @@ template <class T> struct hasSerialize
 		return false;
 	}
 	// int is used to give the precedence!
-	static constexpr bool value = test<T>(int());  //Has to be static, has to be constexpr, and has to have a name, for arcane and complicated syntax sugar reasons.
+	static constexpr bool value = hasSerialize:: template test<T>(int());  //Has to be static, has to be constexpr, and has to have a name, for arcane and complicated syntax sugar reasons.
+	//	The hasSerialize:: template is unnecessary syntax sugar in this context and can be deleted, because membership is assumed, and test is explicitly a template function, but why give the compiler a choice?  In template code, compiler choices are apt to be mysterious and unexpected.
+	//	The template keyword, when it follows a "::", a "." or a "->", indicates use of a template, not declaration of a template, but in other contexts indicates declaration of a template, generating a compile time error.
+	//	You might need the template keyword when a templated member is invoked by overload, though it is not needed here.
+	//	But, depending on the compiler, you may need the template declaration when you invoke a template member of a template.  Which you do a lot of in metacode.
 };
 
 template <class T> struct has_to_string
@@ -97,7 +102,7 @@ template <class T> struct has_to_string
 
 //	Simple notation is "template <typename T> typename std::enable_if<hasSerialize<T>::value, std::string>::type serialize(T & obj)"
 //	Can use the complicated notation hasSerialize<T>::test<T>(int()) to reveal the underlying syntax sugar.
-	template <typename T> typename std::enable_if<hasSerialize<T>::value, std::string>::type serialize(T & obj)
+template <typename T> typename std::enable_if<hasSerialize<T>::value, std::string>::type serialize(T & obj)
 		//	value is the arbitrary name we gave to the return member of the class hasSerialize<T>
 		//	type is the arbitrary name the stl gave to the return member of the class std::enable_if<bool, class>
 		//	"typename" forces the compiler to interpret the declaration as a declaration.
@@ -110,9 +115,9 @@ template <class T> struct has_to_string
 	return obj.serialize();
 }
 
-template <typename T> typename std::enable_if<std::is_integral<T>::value, std::string>::type serialize(T& obj)
+template <typename T> typename std::enable_if<std::is_arithmetic<T>::value, std::string>::type serialize(T obj)
 {
-		return "Integer type";
+		return std::string("Numeric value ")+ std::to_string(obj);
 }
 
 template <typename T> typename std::enable_if<has_to_string<T>::value && !hasSerialize<T>::value && !std::is_integral<T>::value, std::string>::type serialize(T & obj)
@@ -126,7 +131,7 @@ int main() {
 	C c;
 	D d;
 	E e;
-	int i;
+	int i{ 5 };
 
 
 	std::cout << u8R"(The templated function "serialize" is called with an argument belonging to a wide variety of classes, and uses the correct member of each class
@@ -139,5 +144,7 @@ int main() {
 	std::cout << serialize(d) << std::endl;
 	std::cout << serialize(e) << std::endl;	
 	std::cout << serialize(i) << std::endl;
+	std::cout << serialize(7) << std::endl;	
+	std::cout << serialize(7.7) << std::endl;
 	return 0;
 }
